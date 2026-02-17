@@ -18,27 +18,8 @@ public class Main {
 
 
             //multithreaded
-            int current_num = 1;
-            Thread interfaceThread = new Thread() {
-                @Override
-                public void run() {
-                    while(i <= max) {
 
-                    }
-                }
-            };
         }
-    }
-
-    /* Compute and return the number of prime numbers in the range
-     * min to max, inclusive.
-     */
-    public static int countPrimes(int min, int max) {
-        int count = 0;
-        for (int i = min; i <= max; i++)
-            if (isPrime(i))
-                count++;
-        return count;
     }
 
 
