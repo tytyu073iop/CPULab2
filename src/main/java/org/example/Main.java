@@ -10,17 +10,17 @@ public class Main {
 
         for (int i = 1_000_000; i <= 1_00_000_000; i *= 10) {
             // single Thread
-//            System.out.println("Starting single threaded job");
-//            long start = System.currentTimeMillis();
-//            int count = 0;
-//            for (int j = 2; j <= i; j++) {
-//                if (isPrime(j)) {
-//                    count++;
-//                }
-//            }
-//            long end = System.currentTimeMillis();
-//            System.out.printf("there was: %d primes; ", count);
-//            System.out.printf("Single threaded was computing for: %.3f seconds\n", (end - start) / 1000.0);
+            System.out.println("Starting single threaded job");
+            long start = System.currentTimeMillis();
+            int count = 0;
+            for (int j = 2; j <= i; j++) {
+                if (isPrime(j)) {
+                    count++;
+                }
+            }
+            long end = System.currentTimeMillis();
+            System.out.printf("there was: %d primes; ", count);
+            System.out.printf("Single threaded was computing for: %.3f seconds\n", (end - start) / 1000.0);
 
 
             //multithreaded
