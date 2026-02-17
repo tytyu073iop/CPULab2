@@ -4,15 +4,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Coordinates a fixed pool of CounterThread workers. Workers pull work via
- * getNextNumber(); no new threads are created per number.
+ * getNextNumber(). Pause/resume uses Thread.interrupt() and a shared lock.
  */
 public class InterfaceThread extends Thread {
     private final AtomicInteger current_num = new AtomicInteger(2);  // 0 and 1 are not primes
     private final int max;
     private final AtomicInteger count = new AtomicInteger(0);
     private final int amountOfThreads;
-    volatile boolean stop = false;
     private CounterThread[] workers;
+
+    private final Object pauseLock = new Object();
+    private volatile boolean paused = false;
 
     /**
      * Get total number of primes found so far.
@@ -25,9 +27,6 @@ public class InterfaceThread extends Thread {
      * Called by worker threads to get the next number to check. Returns -1 when no more work.
      */
     int getNextNumber() {
-        while (stop) {
-            try { Thread.sleep(10); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-        }
         int n = current_num.getAndIncrement();
         return n <= max ? n : -1;
     }
@@ -40,7 +39,23 @@ public class InterfaceThread extends Thread {
     }
 
     /**
-     * prints state of application before pause
+     * Called by a worker when it receives an interrupt (pause request). Blocks until resumed.
+     */
+    void enterPauseState() {
+        synchronized (pauseLock) {
+            while (paused) {
+                try {
+                    pauseLock.wait();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Prints state of application before pause.
      */
     public void logPauseState() {
         System.out.println("Counting stopped on: " + getCurrent_num());
@@ -50,28 +65,28 @@ public class InterfaceThread extends Thread {
     }
 
     /**
-     * constructs thread
-     * @param m to which number count primes
-     * @param a amount of threads
+     * Constructs coordinator thread.
+     * @param m upper bound to count primes to
+     * @param a number of worker threads
      */
     InterfaceThread(int m, int a) {
         this.max = m;
         this.amountOfThreads = a;
-        workers  = new CounterThread[amountOfThreads];
+        workers = new CounterThread[amountOfThreads];
     }
 
     /**
-     * stops thread <b>custom implementation</b>
+     * Pauses all worker threads using Thread.interrupt().
      */
     public void stopThread() {
-        stop = true;
-        // Wait for worker threads to process the stop signal
-        for (int i = 0; i < amountOfThreads; i++) {
-            workers[i].stopThread();
+        synchronized (pauseLock) {
+            paused = true;
         }
-        // Give threads a moment to exit their loops and update counter
+        for (int i = 0; i < amountOfThreads; i++) {
+            workers[i].interrupt();
+        }
         try {
-            Thread.sleep(50); // Allow threads to exit loops and update counter
+            Thread.sleep(50);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -81,16 +96,18 @@ public class InterfaceThread extends Thread {
     /**
      * Get the next number that would be assigned (for pause state).
      */
-    public int getCurrent_num() { return current_num.get(); }
+    public int getCurrent_num() {
+        return current_num.get();
+    }
 
     /**
-     * starts thread <b>custom implementation</b>
+     * Resumes all worker threads.
      */
     public void startThread() {
-        for (int i = 0; i < amountOfThreads; i++) {
-            workers[i].startThread();
+        synchronized (pauseLock) {
+            paused = false;
+            pauseLock.notifyAll();
         }
-        stop = false;
     }
 
     @Override
@@ -100,13 +117,11 @@ public class InterfaceThread extends Thread {
             workers[i] = new CounterThread(this);
             workers[i].start();
         }
-        for (; current_num.get() <= max;) {
-            for (int i = 0; i < amountOfThreads; i++) {
-                try {
-                    workers[i].join();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
+        for (int i = 0; i < amountOfThreads; i++) {
+            try {
+                workers[i].join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
         }
         long end = System.currentTimeMillis();
